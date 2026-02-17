@@ -4,3 +4,12 @@ numpy
 matplotlib
 seaborn
 scikit-learn
+uvicorn
+fastapi
+mlflow
+pydantic
+joblib
+great-expectations
+pytest
+python-dotenv
+xgboostxc
