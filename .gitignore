@@ -213,3 +213,4 @@ mlruns/
 artifacts/
 *.pyc
 .env
+data

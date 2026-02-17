@@ -12,4 +12,6 @@ joblib
 great-expectations
 pytest
 python-dotenv
-xgboostxc
+xgboost
+posthog
+grado
