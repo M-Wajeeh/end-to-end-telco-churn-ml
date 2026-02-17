@@ -1,19 +1,18 @@
-import great_expectations as ge
 import logging
-from typing import Dict, Any, List
+from typing import List, Tuple
 
 logger = logging.getLogger(__name__)
 
 
-def validate_telco_data(df) -> Dict[str, Any]:
+def validate_telco_data(df) -> Tuple[bool, List[str]]:
     """
     Validate Telco Customer Churn dataset using Great Expectations.
 
     Returns:
-        Dict[str, Any]: Structured validation report
+        Tuple[bool, List[str]]: (is_valid, failed_expectations)
     """
 
-    logger.info("Starting data validation with Great Expectations...")
+    logger.info("Starting data validation...")
 
     # =======================
     # EARLY COLUMN CHECKS
@@ -28,90 +27,63 @@ def validate_telco_data(df) -> Dict[str, Any]:
 
     if missing_cols:
         logger.error(f"Missing required columns: {missing_cols}")
-
-        return {
-            "success": False,
-            "missing_columns": missing_cols,
-            "failed_expectations": ["missing_required_columns"],
-            "total_checks": 0,
-            "passed_checks": 0,
-            "failed_checks": 0,
-            "details": "Schema validation failed due to missing required columns."
-        }
+        return False, ["missing_required_columns"]
 
     logger.info("All required columns are present.")
 
-    # Convert pandas DataFrame to Great Expectations Dataset
-    ge_df = ge.dataset.PandasDataset(df)
-
     # =======================
-    # EXPECTATIONS
+    # CHECKS
     # =======================
-    logger.info("Running schema + business validation expectations...")
-
-    # Schema checks
-    ge_df.expect_column_values_to_not_be_null("customerID")
-
-    # Business logic checks
-    ge_df.expect_column_values_to_be_in_set("gender", ["Male", "Female"])
-    ge_df.expect_column_values_to_be_in_set("Partner", ["Yes", "No"])
-    ge_df.expect_column_values_to_be_in_set("Dependents", ["Yes", "No"])
-    ge_df.expect_column_values_to_be_in_set("PhoneService", ["Yes", "No"])
-
-    ge_df.expect_column_values_to_be_in_set(
-        "Contract", ["Month-to-month", "One year", "Two year"]
-    )
-
-    ge_df.expect_column_values_to_be_in_set(
-        "InternetService", ["DSL", "Fiber optic", "No"]
-    )
-
-    # Numeric constraints
-    ge_df.expect_column_values_to_be_between("tenure", min_value=0, max_value=120)
-    ge_df.expect_column_values_to_be_between("MonthlyCharges", min_value=0, max_value=200)
-    ge_df.expect_column_values_to_be_between("TotalCharges", min_value=0)
-
-    ge_df.expect_column_values_to_not_be_null("tenure")
-    ge_df.expect_column_values_to_not_be_null("MonthlyCharges")
-
-    # Consistency check
-    ge_df.expect_column_pair_values_A_to_be_greater_than_B(
-        column_A="TotalCharges",
-        column_B="MonthlyCharges",
-        or_equal=True,
-        mostly=0.95
-    )
-
-    # =======================
-    # RUN VALIDATION
-    # =======================
-    logger.info("Executing validation suite...")
-    results = ge_df.validate()
-
-    # =======================
-    # PROCESS RESULTS
-    # =======================
+    logger.info("Running schema + business validation checks...")
     failed_expectations: List[str] = []
 
-    for r in results["results"]:
-        if not r["success"]:
-            failed_expectations.append(r["expectation_config"]["expectation_type"])
+    # Ensure stable numeric checks
+    total_charges_num = df["TotalCharges"]
+    if total_charges_num.dtype == "object":
+        total_charges_num = total_charges_num.replace(" ", None)
+    total_charges_num = total_charges_num.astype("float64")
 
-    total_checks = len(results["results"])
-    passed_checks = sum(1 for r in results["results"] if r["success"])
-    failed_checks = total_checks - passed_checks
+    # Non-null checks
+    if df["customerID"].isna().any():
+        failed_expectations.append("expect_customer_id_not_null")
+    if df["tenure"].isna().any():
+        failed_expectations.append("expect_tenure_not_null")
+    if df["MonthlyCharges"].isna().any():
+        failed_expectations.append("expect_monthly_charges_not_null")
 
-    success = results["success"]
+    # Set membership checks
+    if not df["gender"].isin(["Male", "Female"]).all():
+        failed_expectations.append("expect_gender_in_set")
+    if not df["Partner"].isin(["Yes", "No"]).all():
+        failed_expectations.append("expect_partner_in_set")
+    if not df["Dependents"].isin(["Yes", "No"]).all():
+        failed_expectations.append("expect_dependents_in_set")
+    if not df["PhoneService"].isin(["Yes", "No"]).all():
+        failed_expectations.append("expect_phone_service_in_set")
+    if not df["Contract"].isin(["Month-to-month", "One year", "Two year"]).all():
+        failed_expectations.append("expect_contract_in_set")
+    if not df["InternetService"].isin(["DSL", "Fiber optic", "No"]).all():
+        failed_expectations.append("expect_internet_service_in_set")
 
-    report = {
-        "success": success,
-        "missing_columns": [],
-        "total_checks": total_checks,
-        "passed_checks": passed_checks,
-        "failed_checks": failed_checks,
-        "failed_expectations": failed_expectations,
-        "details": "Validation passed successfully." if success else "Validation failed.",
-    }
+    # Numeric range checks
+    if not df["tenure"].between(0, 120).all():
+        failed_expectations.append("expect_tenure_between_0_120")
+    if not df["MonthlyCharges"].between(0, 200).all():
+        failed_expectations.append("expect_monthly_charges_between_0_200")
+    total_charges_non_null = total_charges_num.dropna()
+    if not (total_charges_non_null >= 0).all():
+        failed_expectations.append("expect_total_charges_gte_0")
+
+    # Consistency check: mostly 95% rows should have TotalCharges >= MonthlyCharges
+    consistency_mask = total_charges_num.notna()
+    consistency_ratio = (total_charges_num[consistency_mask] >= df.loc[consistency_mask, "MonthlyCharges"]).mean()
+    if consistency_ratio < 0.95:
+        failed_expectations.append("expect_total_charges_gte_monthly_charges_mostly")
+
+    total_checks = 13
+    failed_checks = len(failed_expectations)
+    passed_checks = total_checks - failed_checks
+    success = failed_checks == 0
 
     if success:
         logger.info(f"Validation PASSED: {passed_checks}/{total_checks} checks passed.")
@@ -119,4 +91,4 @@ def validate_telco_data(df) -> Dict[str, Any]:
         logger.error(f"Validation FAILED: {failed_checks}/{total_checks} checks failed.")
         logger.error(f"Failed expectations: {failed_expectations}")
 
-    return report
+    return success, failed_expectations
