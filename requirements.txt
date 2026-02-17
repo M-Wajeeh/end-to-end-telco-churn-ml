@@ -14,4 +14,4 @@ pytest
 python-dotenv
 xgboost
 posthog
-grado
+gradio
