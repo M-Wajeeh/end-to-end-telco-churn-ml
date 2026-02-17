@@ -1,0 +1,87 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.venv/
+.env
+
+# IDE and Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.project
+.pydevproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+.pytest_cache/
+.coverage
+.tox/
+htmlcov/
+
+# MLflow
+mlruns/
+.mlflow/
+
+# Notebooks (development only)
+notebooks/
+*.ipynb
+.ipynb_checkpoints/
+
+# Documentation
+docs/_build/
+site/
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+*.csv
+!data/processed/Dataset_processed.csv
+!data/raw/Dataset.csv
+
+# Docker
+docker/
+Dockerfile
+.dockerignore
+
+# Others
+.gitattributes
+LICENSE
+README.md
+template.py
+.github/
